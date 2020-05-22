@@ -18,7 +18,10 @@ package io.github.ukuz.jmeter.plugin.piccolo;
 import io.github.ukuz.piccolo.api.connection.Connection;
 import io.github.ukuz.piccolo.client.websocket.WebSocketClient;
 import io.github.ukuz.piccolo.client.websocket.WebSocketClientHandler;
+import io.github.ukuz.piccolo.common.message.BindUserMessage;
+import io.github.ukuz.piccolo.common.message.DispatcherMessage;
 import io.github.ukuz.piccolo.common.message.HandshakeOkMessage;
+import io.github.ukuz.piccolo.common.message.push.DispatcherMqMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.jmeter.samplers.AbstractSampler;
 import org.apache.jmeter.samplers.Entry;
@@ -27,6 +30,8 @@ import org.apache.jmeter.samplers.SampleResult;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author ukuz90
@@ -34,11 +39,14 @@ import java.net.URISyntaxException;
 @Slf4j
 public class PiccoloSampler extends AbstractSampler implements Interruptible, WebSocketClientHandler.BaseHandler {
 
-    private boolean handshake;
     private boolean bind;
     private volatile Connection connection;
+    private String userId;
+    private static AtomicInteger userCount = new AtomicInteger();
+    private int cnt;
 
     public PiccoloSampler() {
+        cnt = userCount.incrementAndGet();
     }
 
     @Override
@@ -49,20 +57,24 @@ public class PiccoloSampler extends AbstractSampler implements Interruptible, We
 
     @Override
     public SampleResult sample(Entry entry) {
-        handshake();
+        String userId = Constant.getBindUserId(this);
+        if (userId == null || userId.isEmpty()) {
+            String userIdPrefix = Constant.getBindUserIdPrefix(this);
+            userId = userIdPrefix + cnt;
+        }
+        Connection connection = getConnection();
+        if (!bind) {
+            try {
+                TimeUnit.MILLISECONDS.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        log.info("bindUser success");
+        DispatcherMessage message = new DispatcherMessage(connection);
+        message.routeKey = Constant.getDispatchRouteKey(this);
+//        message.payload =
         return null;
-    }
-
-    private void handshake() {
-        if (handshake || bind) {
-            return;
-        }
-    }
-
-    private void bindUser() {
-        if (bind) {
-            return;
-        }
     }
 
     private Connection getConnection() {
@@ -92,46 +104,17 @@ public class PiccoloSampler extends AbstractSampler implements Interruptible, We
     @Override
     public void handle(Object msg) {
         if (msg instanceof HandshakeOkMessage) {
-
+            bindUser();
+        } else if (msg instanceof BindUserMessage) {
+            bind = true;
         }
     }
 
-//    private WebSocketClient getClient() {
-//        if (client == null) {
-//            synchronized (this) {
-//                if (client == null) {
-//                    String wsUrl = Constant.getWebSocketUrl(this);
-//                    log.info("wsUrl: {}", wsUrl);
-//                    URI uri = null;
-//                    try {
-//                        uri = new URI(wsUrl);
-//                    } catch (URISyntaxException e) {
-//                        log.error("uri error", e);
-//                    }
-//                    client = new WebSocketClient(uri) {
-//                        @Override
-//                        public void onOpen(ServerHandshake handshakedata) {
-//
-//                        }
-//
-//                        @Override
-//                        public void onMessage(String message) {
-//
-//                        }
-//
-//                        @Override
-//                        public void onClose(int code, String reason, boolean remote) {
-//
-//                        }
-//
-//                        @Override
-//                        public void onError(Exception ex) {
-//
-//                        }
-//                    };
-//                }
-//            }
-//        }
-//        return client;
-//    }
+    private void bindUser() {
+        BindUserMessage msg = new BindUserMessage(connection);
+        msg.userId = userId;
+        msg.tags = "";
+        connection.sendAsync(msg);
+    }
+
 }

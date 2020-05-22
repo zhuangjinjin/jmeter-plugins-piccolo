@@ -25,6 +25,11 @@ public class Constant {
     private Constant() {}
 
     public static final String FIELD_WEBSOCKET_URL = "FIELD_WEBSOCKET_URL";
+    public static final String FIELD_DISPATCH_ROUTE_KEY = "FIELD_DISPATCH_ROUTE_KEY";
+    public static final String FIELD_DISPATCH_PAYLOAD = "FIELD_DISPATCH_PAYLOAD";
+    public static final String FIELD_DISPATCH_PAYLOAD_FILE = "FIELD_DISPATCH_PAYLOAD_FILE";
+    public static final String FIELD_BIND_USER_ID_PREFIX = "FIELD_BIND_USER_ID_PREFIX";
+    public static final String FIELD_BIND_USER_ID = "FIELD_BIND_USER_ID";
 
     public static String getWebSocketUrl(TestElement element) {
         return element.getPropertyAsString(FIELD_WEBSOCKET_URL);
@@ -32,6 +37,46 @@ public class Constant {
 
     public static void setWebSocketUrl(TestElement element, String websocketUrl) {
         element.setProperty(FIELD_WEBSOCKET_URL, websocketUrl);
+    }
+
+    public static String getDispatchRouteKey(TestElement element) {
+        return element.getPropertyAsString(FIELD_DISPATCH_ROUTE_KEY);
+    }
+
+    public static void setDispatchRouteKey(TestElement element, String routeKey) {
+        element.setProperty(FIELD_DISPATCH_ROUTE_KEY, routeKey);
+    }
+
+    public static String getDispatchPayload(TestElement element) {
+        return element.getPropertyAsString(FIELD_DISPATCH_PAYLOAD);
+    }
+
+    public static void setDispatchPayload(TestElement element, String payload) {
+        element.setProperty(FIELD_DISPATCH_PAYLOAD, payload);
+    }
+
+    public static String getDispatchPayloadFile(TestElement element) {
+        return element.getPropertyAsString(FIELD_DISPATCH_PAYLOAD_FILE);
+    }
+
+    public static void setDispatchPayloadFile(TestElement element, String payloadFile) {
+        element.setProperty(FIELD_DISPATCH_PAYLOAD_FILE, payloadFile);
+    }
+
+    public static String getBindUserIdPrefix(TestElement element) {
+        return element.getPropertyAsString(FIELD_BIND_USER_ID_PREFIX);
+    }
+
+    public static void setBindUserIdPrefix(TestElement element, String bindUserIdPrefix) {
+        element.setProperty(FIELD_BIND_USER_ID_PREFIX, bindUserIdPrefix);
+    }
+
+    public static String getBindUserId(TestElement element) {
+        return element.getPropertyAsString(FIELD_BIND_USER_ID);
+    }
+
+    public static void setBindUserId(TestElement element, String bindUserId) {
+        element.setProperty(FIELD_BIND_USER_ID, bindUserId);
     }
 
 }
