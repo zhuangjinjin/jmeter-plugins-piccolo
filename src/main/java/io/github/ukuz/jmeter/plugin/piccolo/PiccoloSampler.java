@@ -18,10 +18,7 @@ package io.github.ukuz.jmeter.plugin.piccolo;
 import io.github.ukuz.piccolo.api.connection.Connection;
 import io.github.ukuz.piccolo.client.websocket.WebSocketClient;
 import io.github.ukuz.piccolo.client.websocket.WebSocketClientHandler;
-import io.github.ukuz.piccolo.common.message.BindUserMessage;
-import io.github.ukuz.piccolo.common.message.DispatcherMessage;
-import io.github.ukuz.piccolo.common.message.HandshakeOkMessage;
-import io.github.ukuz.piccolo.common.message.OkMessage;
+import io.github.ukuz.piccolo.common.message.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -49,6 +46,7 @@ public class PiccoloSampler extends AbstractSampler implements Interruptible, We
     private String userId;
     private static AtomicInteger userCount = new AtomicInteger();
     private int cnt;
+    private byte[] ret;
 
     public PiccoloSampler() {
         cnt = userCount.incrementAndGet();
@@ -63,18 +61,34 @@ public class PiccoloSampler extends AbstractSampler implements Interruptible, We
 
     @Override
     public SampleResult sample(Entry entry) {
+        ret = null;
+        prepare();
+        SampleResult result = new SampleResult();
+        result.setSampleLabel(getName());
+        invokeDispatchMessage(result);
+        result.setDataType(SampleResult.TEXT);
+        result.setResponseData(ret);
+        if (ret != null) {
+            result.setSuccessful(true);
+        }
+        return result;
+    }
+
+    private void prepare() {
         userId = Constant.getBindUserId(this);
         if (StringUtils.isBlank(userId)) {
             String userIdPrefix = Constant.getBindUserIdPrefix(this);
             userId = userIdPrefix + cnt;
         }
         log.debug("userId: {}", userId);
-        Connection connection = getConnection();
+        getConnection();
         if (!bind) {
-            currentThread = Thread.currentThread();
-            LockSupport.park();
+           waitForResult();
         }
         log.info("bind user success");
+    }
+
+    private void invokeDispatchMessage(SampleResult result) {
         DispatcherMessage message = new DispatcherMessage(connection);
         message.routeKey = Constant.getDispatchRouteKey(this);
         String payloadFile = Constant.getDispatchPayloadFile(this);
@@ -87,8 +101,10 @@ public class PiccoloSampler extends AbstractSampler implements Interruptible, We
         } catch (IOException e) {
             log.error("read payload file error", e);
         }
+        result.sampleStart();
         connection.sendSync(message);
-        return null;
+        waitForResult();
+        result.sampleEnd();
     }
 
     private Connection getConnection() {
@@ -120,10 +136,12 @@ public class PiccoloSampler extends AbstractSampler implements Interruptible, We
             bindUser();
         } else if (msg instanceof OkMessage) {
             log.debug("bind user ok, msg: {}", msg);
-            if (currentThread != null) {
-                LockSupport.unpark(currentThread);
-            }
+            obtainResult();
             bind = true;
+        } else if (msg instanceof DispatcherResponseMessage) {
+            log.debug("receive dispatch msg: {}", msg);
+            ret = ((DispatcherResponseMessage)msg).payload;
+            obtainResult();
         }
     }
 
@@ -141,6 +159,18 @@ public class PiccoloSampler extends AbstractSampler implements Interruptible, We
         log.info("clear");
         if (connection != null && !connection.isClosed()) {
             connection.close();
+        }
+    }
+
+    private void waitForResult() {
+        currentThread = Thread.currentThread();
+        LockSupport.park();
+    }
+
+    private void obtainResult() {
+        if (currentThread != null) {
+            LockSupport.unpark(currentThread);
+            currentThread = null;
         }
     }
 }
