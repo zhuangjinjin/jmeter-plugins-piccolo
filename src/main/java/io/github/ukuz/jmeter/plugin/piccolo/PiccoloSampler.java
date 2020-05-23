@@ -21,17 +21,21 @@ import io.github.ukuz.piccolo.client.websocket.WebSocketClientHandler;
 import io.github.ukuz.piccolo.common.message.BindUserMessage;
 import io.github.ukuz.piccolo.common.message.DispatcherMessage;
 import io.github.ukuz.piccolo.common.message.HandshakeOkMessage;
-import io.github.ukuz.piccolo.common.message.push.DispatcherMqMessage;
+import io.github.ukuz.piccolo.common.message.OkMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.samplers.AbstractSampler;
 import org.apache.jmeter.samplers.Entry;
 import org.apache.jmeter.samplers.Interruptible;
 import org.apache.jmeter.samplers.SampleResult;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * @author ukuz90
@@ -40,6 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class PiccoloSampler extends AbstractSampler implements Interruptible, WebSocketClientHandler.BaseHandler {
 
     private boolean bind;
+    private volatile Thread currentThread;
     private volatile Connection connection;
     private String userId;
     private static AtomicInteger userCount = new AtomicInteger();
@@ -47,6 +52,7 @@ public class PiccoloSampler extends AbstractSampler implements Interruptible, We
 
     public PiccoloSampler() {
         cnt = userCount.incrementAndGet();
+        log.info("------------------cnt:{}", cnt);
     }
 
     @Override
@@ -57,23 +63,31 @@ public class PiccoloSampler extends AbstractSampler implements Interruptible, We
 
     @Override
     public SampleResult sample(Entry entry) {
-        String userId = Constant.getBindUserId(this);
-        if (userId == null || userId.isEmpty()) {
+        userId = Constant.getBindUserId(this);
+        if (StringUtils.isBlank(userId)) {
             String userIdPrefix = Constant.getBindUserIdPrefix(this);
             userId = userIdPrefix + cnt;
         }
+        log.debug("userId: {}", userId);
         Connection connection = getConnection();
         if (!bind) {
-            try {
-                TimeUnit.MILLISECONDS.sleep(10);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            currentThread = Thread.currentThread();
+            LockSupport.park();
         }
-        log.info("bindUser success");
+        log.info("bind user success");
         DispatcherMessage message = new DispatcherMessage(connection);
         message.routeKey = Constant.getDispatchRouteKey(this);
-//        message.payload =
+        String payloadFile = Constant.getDispatchPayloadFile(this);
+        try {
+            if (StringUtils.isNotBlank(payloadFile)) {
+                message.payload = FileUtils.readFileToByteArray(new File(payloadFile));
+            } else {
+                log.warn("payload file can not empty");
+            }
+        } catch (IOException e) {
+            log.error("read payload file error", e);
+        }
+        connection.sendSync(message);
         return null;
     }
 
@@ -93,8 +107,6 @@ public class PiccoloSampler extends AbstractSampler implements Interruptible, We
                     } catch (URISyntaxException | InterruptedException e) {
                         log.error("runtime error: ", e);
                     }
-
-
                 }
             }
         }
@@ -104,8 +116,13 @@ public class PiccoloSampler extends AbstractSampler implements Interruptible, We
     @Override
     public void handle(Object msg) {
         if (msg instanceof HandshakeOkMessage) {
+            log.debug("handshake ok, msg: {}", msg);
             bindUser();
-        } else if (msg instanceof BindUserMessage) {
+        } else if (msg instanceof OkMessage) {
+            log.debug("bind user ok, msg: {}", msg);
+            if (currentThread != null) {
+                LockSupport.unpark(currentThread);
+            }
             bind = true;
         }
     }
@@ -115,6 +132,15 @@ public class PiccoloSampler extends AbstractSampler implements Interruptible, We
         msg.userId = userId;
         msg.tags = "";
         connection.sendAsync(msg);
+        log.debug("bind user start");
     }
 
+    @Override
+    public void clear() {
+        super.clear();
+        log.info("clear");
+        if (connection != null && !connection.isClosed()) {
+            connection.close();
+        }
+    }
 }

@@ -22,6 +22,7 @@
         <lombok.version>1.18.12</lombok.version>
         <protostuff.version>1.7.2</protostuff.version>
         <piccolo.version>0.2.0</piccolo.version>
+        <commons-lang3.verson>3.10</commons-lang3.verson>
     </properties>
 
     <dependencies>
@@ -52,17 +53,25 @@
             <version>${lombok.version}</version>
         </dependency>
 
-        <!-- protostuff -->
+        <!-- commons-lang -->
         <dependency>
-            <groupId>io.protostuff</groupId>
-            <artifactId>protostuff-runtime</artifactId>
-            <version>${protostuff.version}</version>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons-lang3.verson}</version>
+            <scope>provided</scope>
         </dependency>
-        <dependency>
-            <groupId>io.protostuff</groupId>
-            <artifactId>protostuff-core</artifactId>
-            <version>${protostuff.version}</version>
-        </dependency>
+
+<!--        &lt;!&ndash; protostuff &ndash;&gt;-->
+<!--        <dependency>-->
+<!--            <groupId>io.protostuff</groupId>-->
+<!--            <artifactId>protostuff-runtime</artifactId>-->
+<!--            <version>${protostuff.version}</version>-->
+<!--        </dependency>-->
+<!--        <dependency>-->
+<!--            <groupId>io.protostuff</groupId>-->
+<!--            <artifactId>protostuff-core</artifactId>-->
+<!--            <version>${protostuff.version}</version>-->
+<!--        </dependency>-->
 
         <dependency>
             <groupId>io.github.ukuz</groupId>

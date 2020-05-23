@@ -63,7 +63,6 @@ public class PiccoloSamplerGui extends AbstractSamplerGui {
 
     @Override
     public void modifyTestElement(TestElement testElement) {
-        log.info("----modifyTestElement");
         super.configureTestElement(testElement);
         panel.flushData(testElement);
     }
